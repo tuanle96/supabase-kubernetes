@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-studio
+  namespace: supabase
+  labels:
+    workload: supabase-studio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-studio
+  template:
+    metadata:
+      labels:
+        workload: supabase-studio
+    spec:
+      serviceAccountName: supabase-studio
+      securityContext: {}
+      containers:
+      - name: supabase-studio
+        securityContext: {}
+        resources: {}
+        image: supabase/studio:20230330-99fed3d
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: STUDIO_PG_META_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-studio
+              key: STUDIO_PG_META_URL
+        - name: SUPABASE_PUBLIC_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-studio
+              key: SUPABASE_PUBLIC_URL
+        - name: SUPABASE_REST_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-studio
+              key: SUPABASE_REST_URL
+        - name: SUPABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-studio
+              key: SUPABASE_URL
+        - name: SUPABASE_ANON_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAiYW5vbiIsCiAgICAiaXNzIjogInN1cGFiYXNlIiwKICAgICJpYXQiOiAxNjc1NDAwNDAwLAogICAgImV4cCI6IDE4MzMxNjY4MDAKfQ.ztuiBzjaVoFHmoljUXWmnuDN6QU2WgJICeqwyzyZO88
+        - name: SUPABASE_SERVICE_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAic2VydmljZV9yb2xlIiwKICAgICJpc3MiOiAic3VwYWJhc2UiLAogICAgImlhdCI6IDE2NzU0MDA0MDAsCiAgICAiZXhwIjogMTgzMzE2NjgwMAp9.qNsmXzz4tG7eqJPh1Y58DbtIlJBauwpqx39UF-MwM8k
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP

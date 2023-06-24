@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-imgproxy
+  namespace: supabase
+data:
+  IMGPROXY_BIND: ":5001"
+  IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+  IMGPROXY_USE_ETAG: "true"
+  IMGPROXY_ENABLE_WEBP_DETECTION: "true"

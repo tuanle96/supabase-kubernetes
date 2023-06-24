@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-realtime
+  labels:
+    workload: supabase-realtime
+  namespace: supabase
+spec:
+  selector:
+    matchLabels:
+      workload: supabase-realtime
+  template:
+    metadata:
+      labels:
+        workload: supabase-realtime
+    spec:
+      serviceAccountName: supabase-realtime
+      securityContext: {}
+      initContainers:
+      - name: init-db
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DB_HOST
+          value: "supabase-db"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: postgres
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          until pg_isready -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER); do
+          echo "Waiting for database to start..."
+          sleep 2
+          done
+        - echo "Database is ready"
+      containers:
+      - name: supabase-realtime
+        securityContext: {}
+        image: supabase/realtime:v2.5.1
+        imagePullPolicy: IfNotPresent
+        resources: {}
+        command: ["/bin/sh"]
+        args: ["-c", "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"]
+        env:
+        - name: DB_AFTER_CONNECT_QUERY
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_AFTER_CONNECT_QUERY
+        - name: DB_ENC_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_ENC_KEY
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_NAME
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_PORT
+        - name: DB_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DB_SSL
+        - name: DNS_NODES
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: DNS_NODES
+        - name: ENABLE_TAILSCALE
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: ENABLE_TAILSCALE
+        - name: ERL_AFLAGS
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: ERL_AFLAGS
+        - name: FLY_ALLOC_ID
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: FLY_ALLOC_ID
+        - name: FLY_APP_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: FLY_APP_NAME
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: PORT
+        - name: REPLICATION_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: REPLICATION_MODE
+        - name: REPLICATION_POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: REPLICATION_POLL_INTERVAL
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: SECRET_KEY_BASE
+        - name: SECURE_CHANNELS
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: SECURE_CHANNELS
+        - name: SLOT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: SLOT_NAME
+        - name: TEMPORARY_SLOT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-realtime
+              key: TEMPORARY_SLOT
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASSWORD
+          value: "postgres"
+        - name: JWT_SECRET
+          value: abcdefghijklmnopqrstuvwxyz123456
+        - name: API_JWT_SECRET
+          value: abcdefghijklmnopqrstuvwxyz123456
+        ports:
+        - name: http
+          containerPort: 4000
+          protocol: TCP

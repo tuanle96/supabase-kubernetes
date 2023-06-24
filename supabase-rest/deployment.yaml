@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-rest
+  labels:
+    workload: supabase-rest
+  namespace: supabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-rest
+  template:
+    metadata:
+      labels:
+        workload: supabase-rest
+    spec:
+      serviceAccountName: supabase-rest
+      securityContext: {}
+      containers:
+      - name: supabase-rest
+        securityContext: {}
+        image: postgrest/postgrest:v10.1.2
+        imagePullPolicy: IfNotPresent
+        resources: {}
+        env:
+        - name: DB_DRIVER
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: DB_DRIVER
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: DB_NAME
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: DB_PORT
+        - name: DB_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: DB_SSL
+        - name: PGRST_DB_ANON_ROLE
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: PGRST_DB_ANON_ROLE
+        - name: PGRST_DB_SCHEMA
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: PGRST_DB_SCHEMA
+        - name: PGRST_DB_USE_LEGACY_GUCS
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-rest
+              key: PGRST_DB_USE_LEGACY_GUCS
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASSWORD
+          value: postgres
+        - name: PGRST_DB_URI
+          value: $(DB_DRIVER)://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL)
+        - name: PGRST_JWT_SECRET
+          value: abcdefghijklmnopqrstuvwxyz123456
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP

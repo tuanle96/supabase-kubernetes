@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-functions
+  namespace: supabase
+  labels:
+    workload: supabase-functions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-functions
+  template:
+    metadata:
+      labels:
+        workload: supabase-functions
+    spec:
+      serviceAccountName: supabase-functions
+      securityContext: {}
+      containers:
+      - name: supabase-functions
+        args: ["start", "--main-service", "/home/deno/functions", "-p 9000"]
+        securityContext: {}
+        resources: {}
+        image: supabase/edge-runtime:v1.2.12
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JWT_SECRET
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: JWT_SECRET
+        - name: SUPABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: SUPABASE_URL
+        - name: SUPABASE_ANON_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: SUPABASE_ANON_KEY
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: SUPABASE_SERVICE_ROLE_KEY
+        - name: SUPABASE_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: SUPABASE_DB_URL
+        - name: VERIFY_JWT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-functions
+              key: VERIFY_JWT
+        ports:
+        - name: http
+          containerPort: 9000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /home/deno/functions
+          name: functions
+      volumes:
+      - name: functions
+        hostPath:
+          path: /storage/dev-research-supabase/supabase-functions/functions

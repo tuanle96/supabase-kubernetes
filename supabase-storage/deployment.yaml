@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-storage
+  labels:
+    workload: supabase-storage
+  namespace: supabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-storage
+  template:
+    metadata:
+      labels:
+        workload: supabase-storage
+    spec:
+      restartPolicy: Always
+      serviceAccountName: supabase-storage
+      securityContext: {}
+      initContainers:
+      - name: init-db
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DB_HOST
+          value: "supabase-db"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: postgres
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          until pg_isready -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER); do
+          echo "Waiting for database to start..."
+          sleep 2
+          done
+        - echo "Database is ready"
+      containers:
+      - name: supabase-storage
+        securityContext: {}
+        image: supabase/storage-api:v0.28.2
+        imagePullPolicy: IfNotPresent
+        resources: {}
+        env:
+        - name: DB_DRIVER
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: DB_DRIVER
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: DB_NAME
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: DB_PORT
+        - name: DB_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: DB_SSL
+        - name: FILE_SIZE_LIMIT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: FILE_SIZE_LIMIT
+        - name: FILE_STORAGE_BACKEND_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: FILE_STORAGE_BACKEND_PATH
+        - name: GLOBAL_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: GLOBAL_S3_BUCKET
+        - name: PGOPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: PGOPTIONS
+        - name: POSTGREST_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: POSTGREST_URL
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: REGION
+        - name: STORAGE_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: STORAGE_BACKEND
+        - name: TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: TENANT_ID
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASSWORD
+          value: postgres
+        - name: DATABASE_URL
+          value: $(DB_DRIVER)://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?search_path=auth&sslmode=$(DB_SSL)
+        - name: PGRST_JWT_SECRET
+          value: abcdefghijklmnopqrstuvwxyz123456
+        - name: ANON_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAiYW5vbiIsCiAgICAiaXNzIjogInN1cGFiYXNlIiwKICAgICJpYXQiOiAxNjc1NDAwNDAwLAogICAgImV4cCI6IDE4MzMxNjY4MDAKfQ.ztuiBzjaVoFHmoljUXWmnuDN6QU2WgJICeqwyzyZO88
+        - name: SERVICE_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAic2VydmljZV9yb2xlIiwKICAgICJpc3MiOiAic3VwYWJhc2UiLAogICAgImlhdCI6IDE2NzU0MDA0MDAsCiAgICAiZXhwIjogMTgzMzE2NjgwMAp9.qNsmXzz4tG7eqJPh1Y58DbtIlJBauwpqx39UF-MwM8k
+        - name: IMGPROXY_URL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-storage
+              key: IMGPROXY_URL
+        ports:
+        - name: http
+          containerPort: 5000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/lib/storage
+          name: storage-data
+      volumes:
+      - name: storage-data
+        hostPath:
+          path: /storage/dev-research-supabase/supabase-storage/data

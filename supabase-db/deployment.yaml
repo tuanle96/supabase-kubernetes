@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-db
+  namespace: supabase
+  labels:
+    workload: supabase-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-db
+  template:
+    metadata:
+      labels:
+        workload: supabase-db
+    spec:
+      containers:
+      - name: supabase-db
+        resources: {}
+        securityContext: {}
+        image: supabase/postgres:15.1.0.54-rc0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: postgres
+        ports:
+        - name: http
+          containerPort: 9999
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /docker-entrypoint-initdb.d/
+          name: custom-init-scripts
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-volume
+      volumes:
+      - name: custom-init-scripts
+        configMap:
+          name: supabase-db-initdb
+      - name: postgres-volume
+        hostPath:
+          path: /storage/dev-research-supabase/supabase-db/data

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-auth
+  namespace: supabase
+data:
+  DB_DRIVER: postgres
+  DB_HOST: supabase-db
+  DB_NAME: postgres
+  DB_PORT: "5432"
+  DB_SSL: allow
+  GOTRUE_API_HOST: 0.0.0.0
+  GOTRUE_API_PORT: "9999"
+  GOTRUE_DISABLE_SIGNUP: "false"
+  GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+  GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+  GOTRUE_JWT_ADMIN_ROLES: service_role
+  GOTRUE_JWT_AUD: authenticated
+  GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+  GOTRUE_JWT_EXP: "3600"
+  GOTRUE_MAILER_AUTOCONFIRM: "true"
+  GOTRUE_MAILER_URLPATHS_CONFIRMATION: http://localhost:32534/auth/v1/verify
+  GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: http://localhost:32534/auth/v1/verify
+  GOTRUE_MAILER_URLPATHS_INVITE: http://localhost:32534/auth/v1/verify
+  GOTRUE_MAILER_URLPATHS_RECOVERY: http://localhost:32534/auth/v1/verify
+  GOTRUE_SITE_URL: https://studio.supabase.yourdomain.com
+  GOTRUE_SMS_AUTOCONFIRM: "false"
+  GOTRUE_SMTP_ADMIN_EMAIL: your-mail@example.com
+  GOTRUE_SMTP_HOST: smtp.example.com
+  GOTRUE_SMTP_PORT: "587"
+  GOTRUE_SMTP_SENDER_NAME: your-mail@example.com
+  GOTRUE_URI_ALLOW_LIST: '*'

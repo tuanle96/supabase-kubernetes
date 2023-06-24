@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-storage
+  namespace: supabase
+data:
+  DB_DRIVER: postgres
+  DB_HOST: supabase-db
+  DB_NAME: postgres
+  DB_PORT: "5432"
+  DB_SSL: disable
+  FILE_SIZE_LIMIT: "52428800"
+  FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+  GLOBAL_S3_BUCKET: stub
+  PGOPTIONS: -c search_path=storage,public
+  POSTGREST_URL: https://rest.supabase.yourdomain.com
+  REGION: stub
+  STORAGE_BACKEND: file
+  TENANT_ID: stub
+  IMGPROXY_URL: https://imgproxy.supabase.yourdomain.com

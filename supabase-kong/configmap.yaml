@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-kong
+  labels:
+    workload: supabase-kong
+  namespace: supabase
+data:
+  KONG_DATABASE: "off"
+  KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+  KONG_DNS_ORDER: LAST,A,CNAME
+  KONG_LOG_LEVEL: debug
+  KONG_PLUGINS: request-transformer,cors,key-auth,acl
+  wrapper.sh: |
+    #!/bin/sh
+
+    set -euo pipefail
+
+    echo "Replacing env placeholders of /home/kong/kong.yml"
+
+    sed \
+    -e "s/\${SUPABASE_ANON_KEY}/${SUPABASE_ANON_KEY}/" \
+    -e "s/\${SUPABASE_SERVICE_KEY}/${SUPABASE_SERVICE_KEY}/" \
+    /home/kong/template.yml \
+    > /home/kong/kong.yml
+
+    exec /docker-entrypoint.sh kong docker-start
+  template.yml: |
+    _format_version: "1.1"
+
+    consumers:
+      - username: anon
+        keyauth_credentials:
+            - key: ${SUPABASE_ANON_KEY}
+      - username: service_role
+        keyauth_credentials:
+            - key: ${SUPABASE_SERVICE_KEY}
+
+    acls:
+      - consumer: anon
+        group: anon
+      - consumer: service_role
+        group: admin
+
+    services:
+      - name: auth-v1-open
+        url: https://auth.supabase.yourdomain.com/verify
+        routes:
+          - name: auth-v1-open
+            strip_path: true
+            paths:
+              - /auth/v1/verify
+        plugins:
+          - name: cors
+      - name: auth-v1-open-callback
+        url: https://auth.supabase.yourdomain.com/callback
+        routes:
+          - name: auth-v1-open-callback
+            strip_path: true
+            paths:
+              - /auth/v1/callback
+        plugins:
+          - name: cors
+      - name: auth-v1-open-authorize
+        url: https://auth.supabase.yourdomain.com/authorize
+        routes:
+          - name: auth-v1-open-authorize
+            strip_path: true
+            paths:
+              - /auth/v1/authorize
+        plugins:
+          - name: cors
+
+
+      - name: auth-v1
+        _comment: "GoTrue: /auth/v1/* -> https://auth.supabase.yourdomain.com/*"
+        url: https://auth.supabase.yourdomain.com
+        routes:
+          - name: auth-v1-all
+            strip_path: true
+            paths:
+              - /auth/v1/
+        plugins:
+          - name: cors
+          - name: key-auth
+            config:
+              hide_credentials: false
+          - name: acl
+            config:
+              hide_groups_header: true
+              allow:
+                - admin
+                - anon
+      - name: rest-v1
+        _comment: "PostgREST: /rest/v1/* -> https://rest.supabase.yourdomain.com/*"
+        url: https://rest.supabase.yourdomain.com/
+        routes:
+          - name: rest-v1-all
+            strip_path: true
+            paths:
+              - /rest/v1/
+        plugins:
+          - name: cors
+          - name: key-auth
+            config:
+              hide_credentials: true
+          - name: acl
+            config:
+              hide_groups_header: true
+              allow:
+                - admin
+                - anon
+
+      - name: realtime-v1
+        _comment: "Realtime: /realtime/v1/* -> ws://realtime.supabase.yourdomain.com/socket/*"
+        url: https://realtime.supabase.yourdomain.com/socket
+        routes:
+          - name: realtime-v1-all
+            strip_path: true
+            paths:
+              - /realtime/v1/
+        plugins:
+          - name: cors
+          - name: key-auth
+            config:
+              hide_credentials: false
+          - name: acl
+            config:
+              hide_groups_header: true
+              allow:
+                - admin
+                - anon
+
+      - name: storage-v1
+        _comment: "Storage: /storage/v1/* -> https://storage.supabase.yourdomain.com/*"
+        url: https://storage.supabase.yourdomain.com/
+        routes:
+          - name: storage-v1-all
+            strip_path: true
+            paths:
+              - /storage/v1/
+        plugins:
+          - name: cors
+
+      - name: meta
+        _comment: "pg-meta: /pg/* -> https://meta.supabase.yourdomain.com/*"
+        url: https://meta.supabase.yourdomain.com/
+        routes:
+          - name: meta-all
+            strip_path: true
+            paths:
+              - /pg/
+        plugins:
+          - name: key-auth
+            config:
+              hide_credentials: false
+          - name: acl
+            config:
+              hide_groups_header: true
+              allow:
+                - admin

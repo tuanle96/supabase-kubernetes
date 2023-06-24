@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-kong
+  namespace: supabase
+  labels:
+    workload: supabase-kong
+spec:
+  selector:
+    matchLabels:
+      workload: supabase-kong
+  template:
+    metadata:
+      labels:
+        workload: supabase-kong
+    spec:
+      securityContext: {}
+      containers:
+      - name: supabase-kong
+        securityContext: {}
+        resources: {}
+        image: "kong:2.8.1"
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        args: ["/scripts/wrapper.sh"]
+        env:
+        - name: KONG_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-kong
+              key: KONG_DATABASE
+        - name: KONG_DECLARATIVE_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-kong
+              key: KONG_DECLARATIVE_CONFIG
+        - name: KONG_DNS_ORDER
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-kong
+              key: KONG_DNS_ORDER
+        - name: KONG_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-kong
+              key: KONG_LOG_LEVEL
+        - name: KONG_PLUGINS
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-kong
+              key: KONG_PLUGINS
+        - name: SUPABASE_ANON_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAiYW5vbiIsCiAgICAiaXNzIjogInN1cGFiYXNlIiwKICAgICJpYXQiOiAxNjc1NDAwNDAwLAogICAgImV4cCI6IDE4MzMxNjY4MDAKfQ.ztuiBzjaVoFHmoljUXWmnuDN6QU2WgJICeqwyzyZO88
+        - name: SUPABASE_SERVICE_KEY
+          value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAic2VydmljZV9yb2xlIiwKICAgICJpc3MiOiAic3VwYWJhc2UiLAogICAgImlhdCI6IDE2NzU0MDA0MDAsCiAgICAiZXhwIjogMTgzMzE2NjgwMAp9.qNsmXzz4tG7eqJPh1Y58DbtIlJBauwpqx39UF-MwM8k
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /home/kong/template.yml
+          name: config
+          subPath: template.yml
+        - mountPath: /scripts
+          name: wrapper
+      volumes:
+      - name: config
+        configMap:
+          name: supabase-kong
+          defaultMode: 0777
+          items:
+          - key: template.yml
+            path: template.yml
+      - name: wrapper
+        configMap:
+          name: supabase-kong
+          defaultMode: 0777
+          items:
+          - key: wrapper.sh
+            path: wrapper.sh

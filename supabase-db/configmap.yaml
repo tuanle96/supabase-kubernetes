@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-db-config
+  namespace: supabase
+  labels:
+    workload: supabase-config-db
+data: {}
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: supabase-db-initdb
+  labels:
+    workload: supabase-init-db
+  namespace: supabase
+data:
+  01-initial-schema.sql: |
+    -- Set up realtime
+    create schema if not exists realtime;
+    -- create publication supabase_realtime; -- defaults to empty publication
+    create publication supabase_realtime;
+    create schema if not exists _realtime;
+    create schema if not exists realtime;
+
+    -- Supabase super admin
+    create user supabase_admin;
+    alter user  supabase_admin with superuser createdb createrole replication bypassrls;
+
+    -- Extension namespacing
+    create schema if not exists extensions;
+    create extension if not exists "uuid-ossp"      with schema extensions;
+    create extension if not exists pgcrypto         with schema extensions;
+    create extension if not exists pgjwt            with schema extensions;
+
+    -- Set up auth roles for the developer
+    create role anon                nologin noinherit;
+    create role authenticated       nologin noinherit; -- "logged in" user: web_user, app_user, etc
+    create role service_role        nologin noinherit bypassrls; -- allow developers to create JWT's that bypass their policies
+
+    create user authenticator noinherit;
+    grant anon              to authenticator;
+    grant authenticated     to authenticator;
+    grant service_role      to authenticator;
+    grant supabase_admin    to authenticator;
+
+    grant usage                     on schema public to postgres, anon, authenticated, service_role;
+    alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
+    alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
+    alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
+
+    -- Allow Extensions to be used in the API
+    grant usage                     on schema extensions to postgres, anon, authenticated, service_role;
+
+    -- Set up namespacing
+    alter user supabase_admin SET search_path TO public, extensions; -- don't include the "auth" schema
+
+    -- These are required so that the users receive grants whenever "supabase_admin" creates tables/function
+    alter default privileges for user supabase_admin in schema public grant all
+        on sequences to postgres, anon, authenticated, service_role;
+    alter default privileges for user supabase_admin in schema public grant all
+        on tables to postgres, anon, authenticated, service_role;
+    alter default privileges for user supabase_admin in schema public grant all
+        on functions to postgres, anon, authenticated, service_role;
+
+    -- Set short statement/query timeouts for API roles
+    alter role anon set statement_timeout = '3s';
+    alter role authenticated set statement_timeout = '8s';
+  02-auth-schema.sql: "CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_admin;\n    #magic___^_^___line\n-- auth.users definition\n    #magic___^_^___line\nCREATE TABLE auth.users (\ninstance_id uuid NULL,\nid uuid NOT NULL UNIQUE,\naud varchar(255) NULL,\n\"role\" varchar(255) NULL,\nemail varchar(255) NULL UNIQUE,\nencrypted_password varchar(255) NULL,\nconfirmed_at timestamptz NULL,\ninvited_at timestamptz NULL,\nconfirmation_token varchar(255) NULL,\nconfirmation_sent_at timestamptz NULL,\nrecovery_token varchar(255) NULL,\nrecovery_sent_at timestamptz NULL,\nemail_change_token varchar(255) NULL,\nemail_change varchar(255) NULL,\nemail_change_sent_at timestamptz NULL,\nlast_sign_in_at timestamptz NULL,\nraw_app_meta_data jsonb NULL,\nraw_user_meta_data jsonb NULL,\nis_super_admin bool NULL,\ncreated_at timestamptz NULL,\nupdated_at timestamptz NULL,\nCONSTRAINT users_pkey PRIMARY KEY (id)\n);\nCREATE INDEX users_instance_id_email_idx ON auth.users USING btree (instance_id, email);\nCREATE INDEX users_instance_id_idx ON auth.users USING btree (instance_id);\ncomment on table auth.users is 'Auth: Stores user login data within a secure schema.';\n    #magic___^_^___line\n-- auth.refresh_tokens definition\n    #magic___^_^___line\nCREATE TABLE auth.refresh_tokens (\ninstance_id uuid NULL,\nid bigserial NOT NULL,\n\"token\" varchar(255) NULL,\nuser_id varchar(255) NULL,\nrevoked bool NULL,\ncreated_at timestamptz NULL,\nupdated_at timestamptz NULL,\nCONSTRAINT refresh_tokens_pkey PRIMARY KEY (id)\n);\nCREATE INDEX refresh_tokens_instance_id_idx ON auth.refresh_tokens USING btree (instance_id);\nCREATE INDEX refresh_tokens_instance_id_user_id_idx ON auth.refresh_tokens USING btree (instance_id, user_id);\nCREATE INDEX refresh_tokens_token_idx ON auth.refresh_tokens USING btree (token);\ncomment on table auth.refresh_tokens is 'Auth: Store of tokens used to refresh JWT tokens once they expire.';\n    #magic___^_^___line\n-- auth.instances definition\n    #magic___^_^___line\nCREATE TABLE auth.instances (\nid uuid NOT NULL,\nuuid uuid NULL,\nraw_base_config text NULL,\ncreated_at timestamptz NULL,\nupdated_at timestamptz NULL,\nCONSTRAINT instances_pkey PRIMARY KEY (id)\n);\ncomment on table auth.instances is 'Auth: Manages users across multiple sites.';\n    #magic___^_^___line\n-- auth.audit_log_entries definition\n    #magic___^_^___line\nCREATE TABLE auth.audit_log_entries (\ninstance_id uuid NULL,\nid uuid NOT NULL,\npayload json NULL,\ncreated_at timestamptz NULL,\nCONSTRAINT audit_log_entries_pkey PRIMARY KEY (id)\n);\nCREATE INDEX audit_logs_instance_id_idx ON auth.audit_log_entries USING btree (instance_id);\ncomment on table auth.audit_log_entries is 'Auth: Audit trail for user actions.';\n    #magic___^_^___line\n-- auth.schema_migrations definition\n    #magic___^_^___line\nCREATE TABLE auth.schema_migrations (\n\"version\" varchar(255) NOT NULL,\nCONSTRAINT schema_migrations_pkey PRIMARY KEY (\"version\")\n);\ncomment on table auth.schema_migrations is 'Auth: Manages updates to the auth system.';\n    #magic___^_^___line\nINSERT INTO auth.schema_migrations (version)\nVALUES  ('20171026211738'),\n        ('20171026211808'),\n        ('20171026211834'),\n        ('20180103212743'),\n        ('20180108183307'),\n        ('20180119214651'),\n        ('20180125194653');\n        #magic___^_^___line\ncreate or replace function auth.uid() \nreturns uuid \nlanguage sql stable\nas $$\nselect \n    coalesce(\n    current_setting('request.jwt.claim.sub', true),\n    (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')\n)::uuid\n$$;\n        #magic___^_^___line\ncreate or replace function auth.role() \nreturns text \nlanguage sql stable\nas $$\nselect \n    coalesce(\n    current_setting('request.jwt.claim.role', true),\n    (current_setting('request.jwt.claims', true)::jsonb ->> 'role')\n)::text\n$$;\n        #magic___^_^___line\ncreate or replace function auth.email() \nreturns text \nlanguage sql stable\nas $$\nselect \n    coalesce(\n    current_setting('request.jwt.claim.email', true),\n    (current_setting('request.jwt.claims', true)::jsonb ->> 'email')\n)::text\n$$;\n        #magic___^_^___line\n-- usage on auth functions to API roles\nGRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;\n        #magic___^_^___line\n-- Supabase super admin\nCREATE USER supabase_auth_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;\nGRANT ALL PRIVILEGES ON SCHEMA auth TO supabase_auth_admin;\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA auth TO supabase_auth_admin;\nGRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA auth TO supabase_auth_admin;\nALTER USER supabase_auth_admin SET search_path = \"auth\";\nALTER table \"auth\".users OWNER TO supabase_auth_admin;\nALTER table \"auth\".refresh_tokens OWNER TO supabase_auth_admin;\nALTER table \"auth\".audit_log_entries OWNER TO supabase_auth_admin;\nALTER table \"auth\".instances OWNER TO supabase_auth_admin;\nALTER table \"auth\".schema_migrations OWNER TO supabase_auth_admin;\n        #magic___^_^___line\nALTER FUNCTION \"auth\".\"uid\" OWNER TO supabase_auth_admin;\nALTER FUNCTION \"auth\".\"role\" OWNER TO supabase_auth_admin;\nALTER FUNCTION \"auth\".\"email\" OWNER TO supabase_auth_admin;\nGRANT EXECUTE ON FUNCTION \"auth\".\"uid\"() TO PUBLIC;\nGRANT EXECUTE ON FUNCTION \"auth\".\"role\"() TO PUBLIC;\nGRANT EXECUTE ON FUNCTION \"auth\".\"email\"() TO PUBLIC;\n        #magic___^_^___line\n"
+  03-storage-schema.sql: |
+    CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION supabase_admin;
+
+    grant usage on schema storage to postgres, anon, authenticated, service_role;
+    alter default privileges in schema storage grant all on tables to postgres, anon, authenticated, service_role;
+    alter default privileges in schema storage grant all on functions to postgres, anon, authenticated, service_role;
+    alter default privileges in schema storage grant all on sequences to postgres, anon, authenticated, service_role;
+
+    CREATE TABLE "storage"."buckets" (
+        "id" text not NULL,
+        "name" text NOT NULL,
+        "owner" uuid,
+        "created_at" timestamptz DEFAULT now(),
+        "updated_at" timestamptz DEFAULT now(),
+        CONSTRAINT "buckets_owner_fkey" FOREIGN KEY ("owner") REFERENCES "auth"."users"("id"),
+        PRIMARY KEY ("id")
+    );
+    CREATE UNIQUE INDEX "bname" ON "storage"."buckets" USING BTREE ("name");
+
+    CREATE TABLE "storage"."objects" (
+        "id" uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+        "bucket_id" text,
+        "name" text,
+        "owner" uuid,
+        "created_at" timestamptz DEFAULT now(),
+        "updated_at" timestamptz DEFAULT now(),
+        "last_accessed_at" timestamptz DEFAULT now(),
+        "metadata" jsonb,
+        CONSTRAINT "objects_bucketId_fkey" FOREIGN KEY ("bucket_id") REFERENCES "storage"."buckets"("id"),
+        CONSTRAINT "objects_owner_fkey" FOREIGN KEY ("owner") REFERENCES "auth"."users"("id"),
+        PRIMARY KEY ("id")
+    );
+    CREATE UNIQUE INDEX "bucketid_objname" ON "storage"."objects" USING BTREE ("bucket_id","name");
+    CREATE INDEX name_prefix_search ON storage.objects(name text_pattern_ops);
+
+    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+    CREATE FUNCTION storage.foldername(name text)
+    RETURNS text[]
+    LANGUAGE plpgsql
+    AS $function$
+    DECLARE
+    _parts text[];
+    BEGIN
+    select string_to_array(name, '/') into _parts;
+    return _parts[1:array_length(_parts,1)-1];
+    END
+    $function$;
+
+    CREATE FUNCTION storage.filename(name text)
+    RETURNS text
+    LANGUAGE plpgsql
+    AS $function$
+    DECLARE
+    _parts text[];
+    BEGIN
+    select string_to_array(name, '/') into _parts;
+    return _parts[array_length(_parts,1)];
+    END
+    $function$;
+
+    CREATE FUNCTION storage.extension(name text)
+    RETURNS text
+    LANGUAGE plpgsql
+    AS $function$
+    DECLARE
+    _parts text[];
+    _filename text;
+    BEGIN
+    select string_to_array(name, '/') into _parts;
+    select _parts[array_length(_parts,1)] into _filename;
+    -- @todo return the last part instead of 2
+    return split_part(_filename, '.', 2);
+    END
+    $function$;
+
+    CREATE FUNCTION storage.search(prefix text, bucketname text, limits int DEFAULT 100, levels int DEFAULT 1, offsets int DEFAULT 0)
+    RETURNS TABLE (
+        name text,
+        id uuid,
+        updated_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ,
+        last_accessed_at TIMESTAMPTZ,
+        metadata jsonb
+    )
+    LANGUAGE plpgsql
+    AS $function$
+    DECLARE
+    _bucketId text;
+    BEGIN
+        -- will be replaced by migrations when server starts
+        -- saving space for cloud-init
+    END
+    $function$;
+
+    -- create migrations table
+    -- https://github.com/ThomWright/postgres-migrations/blob/master/src/migrations/0_create-migrations-table.sql
+    -- we add this table here and not let it be auto-created so that the permissions are properly applied to it
+    CREATE TABLE IF NOT EXISTS storage.migrations (
+    id integer PRIMARY KEY,
+    name varchar(100) UNIQUE NOT NULL,
+    hash varchar(40) NOT NULL, -- sha1 hex encoded hash of the file name and contents, to ensure it hasn't been altered since applying the migration
+    executed_at timestamp DEFAULT current_timestamp
+    );
+
+    CREATE USER supabase_storage_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
+    GRANT ALL PRIVILEGES ON SCHEMA storage TO supabase_storage_admin;
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA storage TO supabase_storage_admin;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA storage TO supabase_storage_admin;
+    ALTER USER supabase_storage_admin SET search_path = "storage";
+    ALTER table "storage".objects owner to supabase_storage_admin;
+    ALTER table "storage".buckets owner to supabase_storage_admin;
+    ALTER table "storage".migrations OWNER TO supabase_storage_admin;
+    ALTER function "storage".foldername(text) owner to supabase_storage_admin;
+    ALTER function "storage".filename(text) owner to supabase_storage_admin;
+    ALTER function "storage".extension(text) owner to supabase_storage_admin;
+    ALTER function "storage".search(text,text,int,int,int) owner to supabase_storage_admin;
+
+  04-post-setup.sql: "ALTER ROLE postgres SET search_path TO \"\\$user\",public,extensions;\nCREATE OR REPLACE FUNCTION extensions.notify_api_restart()\nRETURNS event_trigger\nLANGUAGE plpgsql\nAS $$\nBEGIN\n    NOTIFY ddl_command_end;\nEND;\n$$;\nCREATE EVENT TRIGGER api_restart ON ddl_command_end\nEXECUTE PROCEDURE extensions.notify_api_restart();\nCOMMENT ON FUNCTION extensions.notify_api_restart IS 'Sends a notification to the API to restart. If your database schema has changed, this is required so that Supabase can rebuild the relationships.';\n        #magic___^_^___line\n-- Trigger for pg_cron\nCREATE OR REPLACE FUNCTION extensions.grant_pg_cron_access()\nRETURNS event_trigger\nLANGUAGE plpgsql\nAS $$\nDECLARE\nschema_is_cron bool;\nBEGIN\nschema_is_cron = (\n    SELECT n.nspname = 'cron'\n    FROM pg_event_trigger_ddl_commands() AS ev\n    LEFT JOIN pg_catalog.pg_namespace AS n\n    ON ev.objid = n.oid\n);\n        #magic___^_^___line\nIF schema_is_cron\nTHEN\n    grant usage on schema cron to postgres with grant option;\n        #magic___^_^___line\n    alter default privileges in schema cron grant all on tables to postgres with grant option;\n    alter default privileges in schema cron grant all on functions to postgres with grant option;\n    alter default privileges in schema cron grant all on sequences to postgres with grant option;\n        #magic___^_^___line\n    alter default privileges for user supabase_admin in schema cron grant all\n        on sequences to postgres with grant option;\n    alter default privileges for user supabase_admin in schema cron grant all\n        on tables to postgres with grant option;\n    alter default privileges for user supabase_admin in schema cron grant all\n        on functions to postgres with grant option;\n        #magic___^_^___line\n    grant all privileges on all tables in schema cron to postgres with grant option; \n        #magic___^_^___line\nEND IF;\n        #magic___^_^___line\nEND;\n$$;\nCREATE EVENT TRIGGER issue_pg_cron_access ON ddl_command_end WHEN TAG in ('CREATE SCHEMA')\nEXECUTE PROCEDURE extensions.grant_pg_cron_access();\nCOMMENT ON FUNCTION extensions.grant_pg_cron_access IS 'Grants access to pg_cron';\n        #magic___^_^___line\n-- Supabase dashboard user\nCREATE ROLE dashboard_user NOSUPERUSER CREATEDB CREATEROLE REPLICATION;\nGRANT ALL ON DATABASE postgres TO dashboard_user;\nGRANT ALL ON SCHEMA auth TO dashboard_user;\nGRANT ALL ON SCHEMA extensions TO dashboard_user;\nGRANT ALL ON SCHEMA storage TO dashboard_user;\nGRANT ALL ON ALL TABLES IN SCHEMA auth TO dashboard_user;\nGRANT ALL ON ALL TABLES IN SCHEMA extensions TO dashboard_user;\n-- GRANT ALL ON ALL TABLES IN SCHEMA storage TO dashboard_user;\nGRANT ALL ON ALL SEQUENCES IN SCHEMA auth TO dashboard_user;\nGRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO dashboard_user;\nGRANT ALL ON ALL SEQUENCES IN SCHEMA extensions TO dashboard_user;\nGRANT ALL ON ALL ROUTINES IN SCHEMA auth TO dashboard_user;\nGRANT ALL ON ALL ROUTINES IN SCHEMA storage TO dashboard_user;\nGRANT ALL ON ALL ROUTINES IN SCHEMA extensions TO dashboard_user;\n"

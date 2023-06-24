@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-studio
+  namespace: supabase
+data:
+  STUDIO_PG_META_URL: https://kong.supabase.yourdomain.com/pg
+  SUPABASE_PUBLIC_URL: https://kong.supabase.yourdomain.com
+  SUPABASE_REST_URL: https://kong.supabase.yourdomain.com/rest/v1/
+  SUPABASE_URL: https://kong.supabase.yourdomain.com

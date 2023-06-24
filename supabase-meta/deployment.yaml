@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-meta
+  labels:
+    workload: supabase-meta
+  namespace: supabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload: supabase-meta
+  template:
+    metadata:
+      labels:
+        workload: supabase-meta
+    spec:
+      serviceAccountName: supabase-meta
+      securityContext: {}
+      containers:
+      - name: supabase-meta
+        securityContext: {}
+        resources: {}
+        image: supabase/postgres-meta:v0.60.7
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DB_DRIVER
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: DB_DRIVER
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: DB_NAME
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: DB_PORT
+        - name: DB_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: DB_SSL
+        - name: PG_META_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: supabase-meta
+              key: PG_META_PORT
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASSWORD
+          value: postgres
+        - name: PG_META_DB_HOST
+          value: $(DB_HOST)
+        - name: PG_META_DB_PORT
+          value: $(DB_PORT)
+        - name: PG_META_DB_NAME
+          value: $(DB_NAME)
+        - name: PG_META_DB_USER
+          value: $(DB_USER)
+        - name: PG_META_DB_PASSWORD
+          value: $(DB_PASSWORD)
+        - name: PG_META_DB_SSL_MODE
+          value: $(DB_SSL)
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
